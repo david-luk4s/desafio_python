@@ -1,42 +1,10 @@
-from flask import Flask, render_template, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from datetime import datetime, timezone
+from flask import jsonify
+from .models import Tarefa
+from . import db
+from datetime import datetime
 
-app = Flask(__name__)
 
-# Configuração da conexão com o banco de dados PostgreSQL
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:postgres@db/teclatdb'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Inicializa o SQLAlchemy
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# Modelo para a tabela 'tarefas'
-class Tarefa(db.Model):
-    __tablename__ = 'tarefas'
-    id = db.Column(db.Integer, primary_key=True, nullable=True)
-    titulo = db.Column(db.String(150), nullable=False)
-    descricao = db.Column(db.String(500), nullable=False)
-    status_conclusao = db.Column(db.Boolean, default=False, nullable=False)
-    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    data_status_conclusao = db.Column(db.DateTime, nullable=True)
-
-    def concluir(self):
-        self.status_conclusao = True
-        self.data_status_conclusao = datetime.now(timezone.utc)
-
-# Rota principal
-@app.route('/')
-def index():
-    tarefas = Tarefa.query.order_by(Tarefa.data_criacao).all()
-    return render_template('index.html', tarefas=tarefas, message='')
-
-# Rota API para Criar Tarefa
-@app.route('/api/add_task', methods=['POST'])
-def add_task_api():
-    data = request.json
+def add_task(data):
     task_name = data.get('taskName')
     task_description = data.get('taskDescription')
     
@@ -60,10 +28,7 @@ def add_task_api():
     else:
         return jsonify({'error': 'Nome e descrição da tarefa são obrigatórios.'}), 400
 
-# Rota API para Atualizar Tarefa
-@app.route('/api/update_task/<int:task_id>', methods=['POST'])
-def update_task_api(task_id):
-    data = request.json
+def update_task(task_id, data):
     task = Tarefa.query.get(task_id)
     
     if not task:
@@ -89,8 +54,6 @@ def update_task_api(task_id):
     }
     return jsonify(response)
 
-# Rota API para Deletar Tarefa
-@app.route('/api/delete_task/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
     tarefa = Tarefa.query.get(task_id)
     if tarefa:
@@ -98,7 +61,3 @@ def delete_task(task_id):
         db.session.commit()
         return jsonify({'message': 'Tarefa excluída com sucesso!'}), 200
     return jsonify({'message': 'Tarefa não encontrada!'}), 404
-
-
-if __name__ == '__main__':
-    app.run(debug=True)
